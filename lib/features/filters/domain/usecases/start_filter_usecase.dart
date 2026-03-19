@@ -2,12 +2,12 @@ import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
 import '../repository/filter_repository.dart';
 
-class ListenStatusUseCase {
+class StartFilterUseCase {
   final FilterRepository repository;
 
-  ListenStatusUseCase(this.repository);
+  StartFilterUseCase(this.repository);
 
-  Stream<Either<Failure, String>> call() {
-    return repository.getSystemStatus();
+  Future<Either<Failure, void>> call() {
+    return repository.startFilter();
   }
 }
