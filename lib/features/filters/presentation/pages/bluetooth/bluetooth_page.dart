@@ -12,7 +12,7 @@ class BluetoothPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Connect Bluetooth'),
       ),
-      body: BlocConsumer<BluetoothBloc, BluetoothState>(
+      body: BlocConsumer<BluetoothBloc, BluetoothBlocState>(
         listener: (context, state) {
           if (state is BluetoothConnected) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -65,7 +65,7 @@ class BluetoothPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDeviceList(BuildContext context, BluetoothState state) {
+  Widget _buildDeviceList(BuildContext context, BluetoothBlocState state) {
     List<fbp.ScanResult> results = [];
     if (state is BluetoothScanResults) {
       results = state.results;

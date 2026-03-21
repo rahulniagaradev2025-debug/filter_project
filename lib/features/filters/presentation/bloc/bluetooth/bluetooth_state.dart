@@ -1,17 +1,17 @@
 part of 'bluetooth_bloc.dart';
 
-abstract class BluetoothState extends Equatable {
-  const BluetoothState();
+abstract class BluetoothBlocState extends Equatable {
+  const BluetoothBlocState();
 
   @override
   List<Object> get props => [];
 }
 
-class BluetoothInitial extends BluetoothState {}
+class BluetoothInitial extends BluetoothBlocState {}
 
-class BluetoothScanning extends BluetoothState {}
+class BluetoothScanning extends BluetoothBlocState {}
 
-class BluetoothScanResults extends BluetoothState {
+class BluetoothScanResults extends BluetoothBlocState {
   final List<ScanResult> results;
   const BluetoothScanResults(this.results);
 
@@ -19,9 +19,9 @@ class BluetoothScanResults extends BluetoothState {
   List<Object> get props => [results];
 }
 
-class BluetoothConnecting extends BluetoothState {}
+class BluetoothConnecting extends BluetoothBlocState {}
 
-class BluetoothConnected extends BluetoothState {
+class BluetoothConnected extends BluetoothBlocState {
   final BluetoothDevice device;
   const BluetoothConnected(this.device);
 
@@ -29,7 +29,7 @@ class BluetoothConnected extends BluetoothState {
   List<Object> get props => [device];
 }
 
-class BluetoothError extends BluetoothState {
+class BluetoothError extends BluetoothBlocState {
   final String message;
   const BluetoothError(this.message);
 

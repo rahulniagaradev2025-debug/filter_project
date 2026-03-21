@@ -6,7 +6,7 @@ import 'package:filter_project/core/bluetooth/bluetooth_service.dart';
 part 'bluetooth_event.dart';
 part 'bluetooth_state.dart';
 
-class BluetoothBloc extends Bloc<BluetoothEvent, BluetoothState> {
+class BluetoothBloc extends Bloc<BluetoothEvent, BluetoothBlocState> {
   final AppBluetoothService bluetoothService;
 
   BluetoothBloc({required this.bluetoothService}) : super(BluetoothInitial()) {
