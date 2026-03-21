@@ -5,10 +5,12 @@ class FilterConfigEntity extends Equatable {
   final String method;
   final int filterCount;
   final List<FilterEntity> filters;
-  final int offTime;
-  final int initialDelay;
-  final int delayBetween;
-  final double dpValue;
+  final FilterEntity offTime;
+  final FilterEntity initialDelay;
+  final FilterEntity delayBetween;
+  final FilterEntity dpScanTime;
+  final FilterEntity afterFilterDpScanTime;
+  final double dpDifferenceValue;
 
   const FilterConfigEntity({
     required this.method,
@@ -17,7 +19,9 @@ class FilterConfigEntity extends Equatable {
     required this.offTime,
     required this.initialDelay,
     required this.delayBetween,
-    required this.dpValue,
+    required this.dpScanTime,
+    required this.afterFilterDpScanTime,
+    required this.dpDifferenceValue,
   });
 
   @override
@@ -28,6 +32,8 @@ class FilterConfigEntity extends Equatable {
         offTime,
         initialDelay,
         delayBetween,
-        dpValue,
+        dpScanTime,
+        afterFilterDpScanTime,
+        dpDifferenceValue,
       ];
 }

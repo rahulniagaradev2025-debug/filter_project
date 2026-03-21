@@ -7,4 +7,6 @@ abstract class FilterRepository {
   Stream<Either<Failure, String>> getSystemStatus();
   Future<Either<Failure, void>> startFilter();
   Future<Either<Failure, void>> stopFilter();
+  Future<Either<Failure, void>> requestViewSettings();
+  Future<Either<Failure, void>> requestLiveUpdate();
 }

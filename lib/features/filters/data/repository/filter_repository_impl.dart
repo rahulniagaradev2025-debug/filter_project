@@ -49,4 +49,24 @@ class FilterRepositoryImpl implements FilterRepository {
       return Left(BluetoothFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> requestViewSettings() async {
+    try {
+      await remoteDataSource.requestViewSettings();
+      return const Right(null);
+    } catch (e) {
+      return Left(BluetoothFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> requestLiveUpdate() async {
+    try {
+      await remoteDataSource.requestLiveUpdate();
+      return const Right(null);
+    } catch (e) {
+      return Left(BluetoothFailure(e.toString()));
+    }
+  }
 }
