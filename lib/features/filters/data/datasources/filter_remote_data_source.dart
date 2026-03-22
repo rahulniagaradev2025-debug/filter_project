@@ -19,8 +19,13 @@ class FilterRemoteDataSourceImpl implements FilterRemoteDataSource {
 
   @override
   Future<void> sendConfiguration(FilterConfigModel config) async {
-    final List<int> data = PayloadBuilder.buildConfigPayload(config);
-    await bluetoothService.writeData(data);
+    final payloads = PayloadBuilder.buildConfigPayloads(config);
+    for (var i = 0; i < payloads.length; i++) {
+      await bluetoothService.writeData(payloads[i]);
+      if (i < payloads.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    }
   }
 
   @override
@@ -47,7 +52,7 @@ class FilterRemoteDataSourceImpl implements FilterRemoteDataSource {
   }
 
   @override
-  Future<void> requestLiveUpdate() async {
+  Future<void> requestLiveUpdate() async{
     await bluetoothService.writeData(PayloadBuilder.buildLiveRequest());
   }
 }

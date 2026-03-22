@@ -3,7 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:filter_project/features/filters/presentation/bloc/config/config_bloc.dart';
 import 'package:filter_project/features/filters/domain/entities/filter_config_entity.dart';
 import 'package:filter_project/features/filters/domain/entities/filter_entity.dart';
-import '../../widgets/config/filter_input_widget.dart';
+import '../../widgets/filter_input_widget.dart';
 
 class ConfigPage extends StatefulWidget {
   const ConfigPage({super.key});
@@ -21,26 +21,23 @@ class _ConfigPageState extends State<ConfigPage> {
     (_) => const FilterEntity(hour: 0, minute: 0, second: 0),
   );
 
-  FilterEntity _offTime = const FilterEntity(hour: 0, minute: 0, second: 0);
-  FilterEntity _initialDelay = const FilterEntity(hour: 0, minute: 0, second: 0);
-  FilterEntity _delayBetween = const FilterEntity(hour: 0, minute: 0, second: 0);
-  FilterEntity _dpScanTime = const FilterEntity(hour: 0, minute: 0, second: 0);
-  FilterEntity _afterFilterDpScanTime = const FilterEntity(hour: 0, minute: 0, second: 0);
-  final TextEditingController _dpDifferenceController = TextEditingController();
-
-  @override
-  void dispose() {
-    _dpDifferenceController.dispose();
-    super.dispose();
+  void _showMaxLimitAlert() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Maximum Limit Reached'),
+        content: const Text('The controller supports a maximum of 8 relays. Please enter a value between 1 and 8.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+        ],
+      ),
+    );
   }
 
-  void _updateFilter(int index, {int? h, int? m, int? s}) {
-    final current = _filters[index];
-    _filters[index] = FilterEntity(
-      hour: h ?? current.hour,
-      minute: m ?? current.minute,
-      second: s ?? current.second,
-    );
+  void _updateFilter(int index, int h, int m, int s) {
+    setState(() {
+      _filters[index] = FilterEntity(hour: h, minute: m, second: s);
+    });
   }
 
   @override
@@ -49,83 +46,60 @@ class _ConfigPageState extends State<ConfigPage> {
       listener: (context, state) {
         if (state is ConfigSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Configuration Sent Successfully')),
+            const SnackBar(content: Text('Configuration Sent Successfully'), behavior: SnackBarBehavior.floating),
           );
           Navigator.pop(context);
         } else if (state is ConfigError) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${state.message}')),
+            SnackBar(content: Text('Error: ${state.message}'), backgroundColor: Colors.red),
           );
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('Filter Configuration')),
+        backgroundColor: Colors.grey[50],
+        appBar: AppBar(
+          title: const Text('Device Configuration'),
+          elevation: 0,
+          centerTitle: true,
+        ),
         body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _buildSectionHeader('General Settings'),
               _buildDropdownField('Filter Method', ['Time', 'DP', 'Both'], _selectedMethod, (val) {
                 setState(() => _selectedMethod = val!);
               }),
               const SizedBox(height: 16),
-              _buildNumberField('Filter Count (1-8)', (val) {
-                final count = int.tryParse(val) ?? 1;
-                if (count >= 1 && count <= 8) setState(() => _filterCount = count);
+              _buildNumberField('Number of Relays (1-8)', (val) {
+                final count = int.tryParse(val);
+                if (count != null) {
+                  if (count > 8) {
+                    _showMaxLimitAlert();
+                  } else if (count >= 1) {
+                    setState(() => _filterCount = count);
+                  }
+                }
               }),
-              const Divider(height: 32),
-              Text('Filter Settings', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 32),
+              _buildSectionHeader('Relay Operation Times'),
+              _buildProtocolHintCard(),
+              const SizedBox(height: 16),
               ...List.generate(
                 _filterCount,
                 (index) => FilterInputWidget(
                   index: index + 1,
-                  onHourChanged: (val) => _updateFilter(index, h: val),
-                  onMinuteChanged: (val) => _updateFilter(index, m: val),
-                  onSecondChanged: (val) => _updateFilter(index, s: val),
+                  hour: _filters[index].hour,
+                  minute: _filters[index].minute,
+                  second: _filters[index].second,
+                  onTimeChanged: (h, m, s) => _updateFilter(index, h, m, s),
+                  label: 'Relay ${index + 1} ON Time',
                 ),
               ),
-              const Divider(height: 32),
-              Text('Additional Parameters', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              _buildTimeInput('Filter OFF Time', (h, m, s) => _offTime = FilterEntity(hour: h, minute: m, second: s)),
-              _buildTimeInput('Filter Initial Delay', (h, m, s) => _initialDelay = FilterEntity(hour: h, minute: m, second: s)),
-              _buildTimeInput('Filter Delay Between', (h, m, s) => _delayBetween = FilterEntity(hour: h, minute: m, second: s)),
-              _buildTimeInput('Filter Dp Scan Time', (h, m, s) => _dpScanTime = FilterEntity(hour: h, minute: m, second: s)),
-              _buildTimeInput('After Filter Dp Scan Time', (h, m, s) => _afterFilterDpScanTime = FilterEntity(hour: h, minute: m, second: s)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _dpDifferenceController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Dp Difference Value', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 32),
-              BlocBuilder<ConfigBloc, ConfigState>(
-                builder: (context, state) {
-                  return ElevatedButton(
-                    onPressed: state is ConfigLoading
-                        ? null
-                        : () {
-                            final config = FilterConfigEntity(
-                              method: _selectedMethod,
-                              filterCount: _filterCount,
-                              filters: _filters.sublist(0, _filterCount),
-                              offTime: _offTime,
-                              initialDelay: _initialDelay,
-                              delayBetween: _delayBetween,
-                              dpScanTime: _dpScanTime,
-                              afterFilterDpScanTime: _afterFilterDpScanTime,
-                              dpDifferenceValue: double.tryParse(_dpDifferenceController.text) ?? 0.0,
-                            );
-                            context.read<ConfigBloc>().add(SendConfigurationEvent(config));
-                          },
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                    child: state is ConfigLoading
-                        ? const CircularProgressIndicator()
-                        : const Text('Submit Configuration'),
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 40),
+              _buildSubmitButton(),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -133,50 +107,105 @@ class _ConfigPageState extends State<ConfigPage> {
     );
   }
 
-  Widget _buildTimeInput(String label, Function(int, int, int) onTimeChanged) {
-    int h = 0, m = 0, s = 0;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ),
-        Row(
-          children: [
-            Expanded(child: _buildSmallField('Hr', (v) { h = int.tryParse(v) ?? 0; onTimeChanged(h, m, s); })),
-            const SizedBox(width: 8),
-            Expanded(child: _buildSmallField('Min', (v) { m = int.tryParse(v) ?? 0; onTimeChanged(h, m, s); })),
-            const SizedBox(width: 8),
-            Expanded(child: _buildSmallField('Sec', (v) { s = int.tryParse(v) ?? 0; onTimeChanged(h, m, s); })),
-          ],
-        ),
-      ],
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16, left: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blue.shade900, letterSpacing: 1.2),
+      ),
     );
   }
 
-  Widget _buildSmallField(String label, ValueChanged<String> onChanged) {
-    return TextField(
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), contentPadding: const EdgeInsets.all(8)),
-      onChanged: onChanged,
+  Widget _buildProtocolHintCard() {
+    final payloadGroups = (_filterCount / 4).ceil();
+    final relayWord = _filterCount == 1 ? 'relay' : 'relays';
+    final packetWord = payloadGroups == 1 ? 'packet' : 'packets';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.shade100),
+      ),
+      child: Text(
+        'Hardware protocol supports 4 relay timers per settings packet. '
+        'The app will send $payloadGroups $packetWord for $_filterCount $relayWord.',
+        style: TextStyle(
+          color: Colors.blue.shade900,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    return BlocBuilder<ConfigBloc, ConfigState>(
+      builder: (context, state) {
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8)),
+            ],
+          ),
+          child: ElevatedButton(
+            onPressed: state is ConfigLoading
+                ? null
+                : () {
+                    final config = FilterConfigEntity(
+                      method: _selectedMethod,
+                      filterCount: _filterCount,
+                      filters: _filters.sublist(0, _filterCount),
+                      offTime: const FilterEntity(hour: 0, minute: 0, second: 0),
+                      initialDelay: const FilterEntity(hour: 0, minute: 0, second: 0),
+                      delayBetween: const FilterEntity(hour: 0, minute: 0, second: 0),
+                      dpScanTime: const FilterEntity(hour: 0, minute: 0, second: 0),
+                      afterFilterDpScanTime: const FilterEntity(hour: 0, minute: 0, second: 0),
+                      dpDifferenceValue: 0.0,
+                    );
+                    context.read<ConfigBloc>().add(SendConfigurationEvent(config));
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blue.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 0,
+            ),
+            child: state is ConfigLoading
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('SEND CONFIGURATION TO DEVICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildDropdownField(String label, List<String> items, String value, ValueChanged<String?> onChanged) {
-    return DropdownButtonFormField<String>(
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-      value: value,
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-      onChanged: onChanged,
+    return Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.blue.shade50)),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: DropdownButtonFormField<String>(
+        decoration: InputDecoration(labelText: label, border: InputBorder.none, labelStyle: TextStyle(color: Colors.blue.shade900)),
+        value: value,
+        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+        onChanged: onChanged,
+      ),
     );
   }
 
-  Widget _buildNumberField(String label, ValueChanged<String> onChanged) {
-    return TextField(
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
-      onChanged: onChanged,
+  Widget _buildNumberField(String label, ValueChanged<String> onChanged, {TextEditingController? controller}) {
+    return Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.blue.shade50)),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: TextField(
+        controller: controller,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        onChanged: onChanged,
+        decoration: InputDecoration(labelText: label, border: InputBorder.none, labelStyle: TextStyle(color: Colors.blue.shade900)),
+      ),
     );
   }
 }

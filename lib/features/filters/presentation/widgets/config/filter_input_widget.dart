@@ -31,9 +31,11 @@ class FilterInputWidget extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: _buildTimeField(context, 'Hour', onHourChanged),
+                  child: _buildTimeField(context, 'Hour', onHourChanged)
+
                 ),
                 const SizedBox(width: 8),
                 Expanded(

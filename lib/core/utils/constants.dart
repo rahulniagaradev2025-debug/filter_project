@@ -6,8 +6,17 @@ class AppConstants {
   static const String stopCommand = 'value:stop:/r';
   static const String protocolEnd = '/r';
 
+  // BLE Hardware UUIDs
+  // Fill these in with your controller's UUIDs once you confirm them from the BLE kit.
+  // When left empty, the app falls back to the first matching characteristic it finds.
+  static const String preferredBleServiceUuid = '';
+  static const String preferredBleWriteCharacteristicUuid = '';
+  static const String preferredBleNotifyCharacteristicUuid = '';
+
   // Filter Configuration
   static const int maxFilterCount = 8;
+  static const int filtersPerPayload = 4;
+  static const int maxSettingsPayloadCount = 3;
   static const List<String> filterMethods = ['Time', 'DP', 'Both'];
 
   // Bluetooth

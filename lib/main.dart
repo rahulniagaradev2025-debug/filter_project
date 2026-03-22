@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<ExecutionBloc>()..add(ListenStatusEvent())),
       ],
       child: MaterialApp(
-        title: 'Filter Control System',
+        title: 'FLITER BACKWASH (BLE)',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
