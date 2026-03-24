@@ -30,9 +30,9 @@ class FilterRemoteDataSourceImpl implements FilterRemoteDataSource {
 
   @override
   Stream<String> getSystemStatus() {
-    // We decode the bytes directly to UTF8 string so the Parser gets the raw '$:...' format
+    // Hardware notifications may arrive as JSON or protocol strings; keep them raw for the parser.
     return bluetoothService.subscribeToNotifications().map((data) {
-      return utf8.decode(data);
+      return utf8.decode(data, allowMalformed: true);
     });
   }
 

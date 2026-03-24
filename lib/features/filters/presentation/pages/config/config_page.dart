@@ -1,43 +1,232 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:filter_project/features/filters/presentation/bloc/config/config_bloc.dart';
-import 'package:filter_project/features/filters/domain/entities/filter_config_entity.dart';
-import 'package:filter_project/features/filters/domain/entities/filter_entity.dart';
-import '../../widgets/filter_input_widget.dart';
+
+import '../../../../../core/storage/app_config_preferences.dart';
+import '../../../domain/entities/filter_config_entity.dart';
+import '../../../domain/entities/filter_entity.dart';
+import '../../bloc/config/config_bloc.dart';
 
 class ConfigPage extends StatefulWidget {
-  const ConfigPage({super.key});
+  final VoidCallback? onNavigateDashboard;
+
+  const ConfigPage({
+    super.key,
+    this.onNavigateDashboard,
+  });
 
   @override
   State<ConfigPage> createState() => _ConfigPageState();
 }
 
 class _ConfigPageState extends State<ConfigPage> {
+  final _preferences = AppConfigPreferences.instance;
+  final _filterCountController = TextEditingController();
+  final _flowController = TextEditingController(text: '0');
+
   String _selectedMethod = 'Time';
-  int _filterCount = 1;
+  int _filterCount = 0;
+  late List<FilterEntity> _filters;
+  FilterEntity _offTime = const FilterEntity(hour: 0, minute: 0, second: 0);
+  FilterEntity _initialDelay = const FilterEntity(hour: 0, minute: 0, second: 0);
+  FilterEntity _delayBetween = const FilterEntity(hour: 0, minute: 0, second: 0);
+  FilterEntity _dpScanTime = const FilterEntity(hour: 0, minute: 0, second: 0);
 
-  final List<FilterEntity> _filters = List.generate(
-    8,
-    (_) => const FilterEntity(hour: 0, minute: 0, second: 0),
-  );
+  @override
+  void initState() {
+    super.initState();
+    _filters = List.generate(
+      8,
+      (_) => const FilterEntity(hour: 0, minute: 0, second: 0),
+    );
+    _loadSavedConfig();
+  }
 
-  void _showMaxLimitAlert() {
-    showDialog(
+  Future<void> _loadSavedConfig() async {
+    final config = await _preferences.loadSavedConfig();
+    if (!mounted || config == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedMethod = config.method;
+      _filterCount = config.filterCount;
+      _filterCountController.text =
+          _filterCount == 0 ? '' : _filterCount.toString();
+      for (var i = 0; i < config.filters.length && i < _filters.length; i++) {
+        _filters[i] = config.filters[i];
+      }
+      _offTime = config.offTime;
+      _initialDelay = config.initialDelay;
+      _delayBetween = config.delayBetween;
+      _dpScanTime = config.dpScanTime;
+      _flowController.text = config.dpDifferenceValue.toStringAsFixed(0);
+    });
+  }
+
+  @override
+  void dispose() {
+    _filterCountController.dispose();
+    _flowController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showMaxLimitAlert() async {
+    await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Maximum Limit Reached'),
-        content: const Text('The controller supports a maximum of 8 relays. Please enter a value between 1 and 8.'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Limit Reached'),
+        content: const Text(
+          'The maximum number of filters is 8. Please enter a value from 1 to 8.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
   }
 
-  void _updateFilter(int index, int h, int m, int s) {
-    setState(() {
-      _filters[index] = FilterEntity(hour: h, minute: m, second: s);
-    });
+  void _onFilterCountChanged(String value) {
+    if (value.trim().isEmpty) {
+      setState(() => _filterCount = 0);
+      return;
+    }
+
+    final count = int.tryParse(value);
+    if (count == null) {
+      return;
+    }
+
+    if (count > 8) {
+      _filterCountController.text = _filterCount == 0 ? '' : _filterCount.toString();
+      _filterCountController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _filterCountController.text.length),
+      );
+      _showMaxLimitAlert();
+      return;
+    }
+
+    if (count >= 0) {
+      setState(() => _filterCount = count);
+    }
+  }
+
+  Future<void> _pickFilterTime(int index) async {
+    final current = _filters[index];
+    final picked = await _pickTime(current);
+    if (picked == null) {
+      return;
+    }
+
+    setState(() => _filters[index] = picked);
+  }
+
+  Future<void> _pickCommonTime(
+    FilterEntity current,
+    ValueChanged<FilterEntity> onChanged,
+  ) async {
+    final picked = await _pickTime(current);
+    if (picked == null) {
+      return;
+    }
+
+    setState(() => onChanged(picked));
+  }
+
+  Future<FilterEntity?> _pickTime(FilterEntity current) async {
+    Duration tempDuration = Duration(
+      hours: current.hour,
+      minutes: current.minute,
+      seconds: current.second,
+    );
+
+    final picked = await showModalBottomSheet<Duration>(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          height: 300,
+          color: Colors.white,
+          child: Column(
+            children: [
+              Container(
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, tempDuration),
+                      child: const Text('Done'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: CupertinoTimerPicker(
+                  mode: CupertinoTimerPickerMode.hms,
+                  initialTimerDuration: tempDuration,
+                  onTimerDurationChanged: (duration) {
+                    tempDuration = duration;
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (picked == null) {
+      return null;
+    }
+
+    return FilterEntity(
+      hour: picked.inHours,
+      minute: picked.inMinutes % 60,
+      second: picked.inSeconds % 60,
+    );
+  }
+
+  String _formatTime(FilterEntity time) {
+    final h = time.hour.toString().padLeft(2, '0');
+    final m = time.minute.toString().padLeft(2, '0');
+    final s = time.second.toString().padLeft(2, '0');
+    return '$h:$m:$s';
+  }
+
+  FilterConfigEntity _buildConfig() {
+    return FilterConfigEntity(
+      method: _selectedMethod,
+      filterCount: _filterCount,
+      filters: _filters.sublist(0, _filterCount),
+      offTime: _offTime,
+      initialDelay: _initialDelay,
+      delayBetween: _delayBetween,
+      dpScanTime: _dpScanTime,
+      afterFilterDpScanTime: const FilterEntity(hour: 0, minute: 0, second: 0),
+      dpDifferenceValue: double.tryParse(_flowController.text) ?? 0,
+    );
+  }
+
+  Future<void> _saveAndSendConfig() async {
+    final config = _buildConfig();
+    await _preferences.saveConfig(config);
+    if (!mounted) {
+      return;
+    }
+    context.read<ConfigBloc>().add(SendConfigurationEvent(config));
   }
 
   @override
@@ -46,166 +235,253 @@ class _ConfigPageState extends State<ConfigPage> {
       listener: (context, state) {
         if (state is ConfigSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Configuration Sent Successfully'), behavior: SnackBarBehavior.floating),
+            const SnackBar(
+              content: Text('Configuration saved and sent successfully'),
+              behavior: SnackBarBehavior.floating,
+            ),
           );
-          Navigator.pop(context);
+          widget.onNavigateDashboard?.call();
         } else if (state is ConfigError) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${state.message}'), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text('Error: ${state.message}'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       },
-      child: Scaffold(
-        backgroundColor: Colors.grey[50],
-        appBar: AppBar(
-          title: const Text('Device Configuration'),
-          elevation: 0,
-          centerTitle: true,
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader('General Settings'),
-              _buildDropdownField('Filter Method', ['Time', 'DP', 'Both'], _selectedMethod, (val) {
-                setState(() => _selectedMethod = val!);
-              }),
-              const SizedBox(height: 16),
-              _buildNumberField('Number of Relays (1-8)', (val) {
-                final count = int.tryParse(val);
-                if (count != null) {
-                  if (count > 8) {
-                    _showMaxLimitAlert();
-                  } else if (count >= 1) {
-                    setState(() => _filterCount = count);
-                  }
-                }
-              }),
-              const SizedBox(height: 32),
-              _buildSectionHeader('Relay Operation Times'),
-              _buildProtocolHintCard(),
-              const SizedBox(height: 16),
-              ...List.generate(
-                _filterCount,
-                (index) => FilterInputWidget(
-                  index: index + 1,
-                  hour: _filters[index].hour,
-                  minute: _filters[index].minute,
-                  second: _filters[index].second,
-                  onTimeChanged: (h, m, s) => _updateFilter(index, h, m, s),
-                  label: 'Relay ${index + 1} ON Time',
+              _buildHeader(),
+              const SizedBox(height: 26),
+              const Text('General Settings', style: _sectionTitleStyle),
+              const SizedBox(height: 12),
+              _buildDropdownField(),
+              const SizedBox(height: 10),
+              _buildTextFieldCard(
+                controller: _filterCountController,
+                label: 'Enter number of relays(1-8)',
+                keyboardType: TextInputType.number,
+                onChanged: _onFilterCountChanged,
+              ),
+              const SizedBox(height: 18),
+              if (_filterCount > 0) ...[
+                for (var i = 0; i < _filterCount; i++) ...[
+                  Text('Filter ${i + 1}', style: _sectionTitleStyle),
+                  const SizedBox(height: 10),
+                  _buildTimeField(
+                    label: 'Filter ${i + 1} On Time',
+                    value: _formatTime(_filters[i]),
+                    onTap: () => _pickFilterTime(i),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ],
+              const Text('Common Settings', style: _sectionTitleStyle),
+              const SizedBox(height: 10),
+              _buildTimeField(
+                label: 'Filter Off Time',
+                value: _formatTime(_offTime),
+                onTap: () => _pickCommonTime(
+                  _offTime,
+                  (value) => _offTime = value,
                 ),
               ),
-              const SizedBox(height: 40),
-              _buildSubmitButton(),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16, left: 4),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.blue.shade900, letterSpacing: 1.2),
-      ),
-    );
-  }
-
-  Widget _buildProtocolHintCard() {
-    final payloadGroups = (_filterCount / 4).ceil();
-    final relayWord = _filterCount == 1 ? 'relay' : 'relays';
-    final packetWord = payloadGroups == 1 ? 'packet' : 'packets';
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.blue.shade100),
-      ),
-      child: Text(
-        'Hardware protocol supports 4 relay timers per settings packet. '
-        'The app will send $payloadGroups $packetWord for $_filterCount $relayWord.',
-        style: TextStyle(
-          color: Colors.blue.shade900,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSubmitButton() {
-    return BlocBuilder<ConfigBloc, ConfigState>(
-      builder: (context, state) {
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8)),
-            ],
-          ),
-          child: ElevatedButton(
-            onPressed: state is ConfigLoading
-                ? null
-                : () {
-                    final config = FilterConfigEntity(
-                      method: _selectedMethod,
-                      filterCount: _filterCount,
-                      filters: _filters.sublist(0, _filterCount),
-                      offTime: const FilterEntity(hour: 0, minute: 0, second: 0),
-                      initialDelay: const FilterEntity(hour: 0, minute: 0, second: 0),
-                      delayBetween: const FilterEntity(hour: 0, minute: 0, second: 0),
-                      dpScanTime: const FilterEntity(hour: 0, minute: 0, second: 0),
-                      afterFilterDpScanTime: const FilterEntity(hour: 0, minute: 0, second: 0),
-                      dpDifferenceValue: 0.0,
+              const SizedBox(height: 10),
+              _buildTimeField(
+                label: 'Filter Initial Delay',
+                value: _formatTime(_initialDelay),
+                onTap: () => _pickCommonTime(
+                  _initialDelay,
+                  (value) => _initialDelay = value,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildTimeField(
+                label: 'Filter Delay Between',
+                value: _formatTime(_delayBetween),
+                onTap: () => _pickCommonTime(
+                  _delayBetween,
+                  (value) => _delayBetween = value,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildTimeField(
+                label: 'Filter Dp Scan Time',
+                value: _formatTime(_dpScanTime),
+                onTap: () => _pickCommonTime(
+                  _dpScanTime,
+                  (value) => _dpScanTime = value,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _buildTextFieldCard(
+                controller: _flowController,
+                label: 'Calc Flow 3Phase',
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: BlocBuilder<ConfigBloc, ConfigState>(
+                  builder: (context, state) {
+                    return ElevatedButton(
+                      onPressed: state is ConfigLoading ? null : _saveAndSendConfig,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2F80ED),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: state is ConfigLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Save Settings',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
                     );
-                    context.read<ConfigBloc>().add(SendConfigurationEvent(config));
                   },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-            ),
-            child: state is ConfigLoading
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('SEND CONFIGURATION TO DEVICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDropdownField(String label, List<String> items, String value, ValueChanged<String?> onChanged) {
-    return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.blue.shade50)),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: DropdownButtonFormField<String>(
-        decoration: InputDecoration(labelText: label, border: InputBorder.none, labelStyle: TextStyle(color: Colors.blue.shade900)),
-        value: value,
-        items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-        onChanged: onChanged,
+        ),
       ),
     );
   }
 
-  Widget _buildNumberField(String label, ValueChanged<String> onChanged, {TextEditingController? controller}) {
+  Widget _buildHeader() {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: widget.onNavigateDashboard,
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+        ),
+        const Expanded(
+          child: Text(
+            'Device Configuration',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
+        ),
+        const SizedBox(width: 48),
+      ],
+    );
+  }
+
+  Widget _buildDropdownField() {
     return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.blue.shade50)),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: _cardDecoration(),
+      child: DropdownButtonFormField<String>(
+        value: _selectedMethod,
+        decoration: const InputDecoration(
+          labelText: 'Filter Method',
+          border: InputBorder.none,
+        ),
+        items: const [
+          DropdownMenuItem(value: 'Time', child: Text('Time')),
+          DropdownMenuItem(value: 'DP', child: Text('DP')),
+          DropdownMenuItem(value: 'Both', child: Text('Both')),
+        ],
+        onChanged: (value) {
+          if (value == null) {
+            return;
+          }
+          setState(() => _selectedMethod = value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTimeField({
+    required String label,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: _cardDecoration(),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF2D2D2D),
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFD9D9D9)),
+              ),
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF8A8A8A),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextFieldCard({
+    required TextEditingController controller,
+    required String label,
+    TextInputType? keyboardType,
+    ValueChanged<String>? onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: _cardDecoration(),
       child: TextField(
         controller: controller,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        keyboardType: keyboardType,
         onChanged: onChanged,
-        decoration: InputDecoration(labelText: label, border: InputBorder.none, labelStyle: TextStyle(color: Colors.blue.shade900)),
+        decoration: InputDecoration(
+          labelText: label,
+          border: InputBorder.none,
+        ),
       ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFA6D6FF)),
     );
   }
 }
+
+const _sectionTitleStyle = TextStyle(
+  fontSize: 15,
+  fontWeight: FontWeight.w500,
+  color: Color(0xFF303030),
+);

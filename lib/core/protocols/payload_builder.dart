@@ -1,62 +1,78 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../utils/constants.dart';
 import '../../features/filters/data/models/filter_config_model.dart';
 import '../../features/filters/domain/entities/filter_entity.dart';
 
 class PayloadBuilder {
-  /// Builds the string-based payload for settings.
-  /// Format: $:MsgLength:PayloadId:FilterMethod:FilterCount:F1H:F1M:F1S:...:F4H:F4M:F4S:Crc:\r
+  /// Builds the string-based payloads for settings.
+  /// Payload Id = 1, 2, 3 (For Set 1, 2, 3)
+  /// Set 1: Filters 1-4
+  /// Set 2: Filters 5-8
+  /// Set 3: Common Parameters
+  /// Format: $:MsgLength:PayloadId:FilterMethod:FilterCount:F1H:F1M:F1S:F2H:F2M:F2S:F3H:F3M:F3S:F4H:F4M:F4S:Crc:\r
   static List<List<int>> buildConfigPayloads(FilterConfigModel config) {
-    final totalPayloads =
-        (config.filterCount / AppConstants.filtersPerPayload).ceil();
-    final payloadCount = totalPayloads
-        .clamp(1, AppConstants.maxSettingsPayloadCount)
-        .toInt();
-    return List.generate(payloadCount, (payloadIndex) {
-      final startIndex = payloadIndex * AppConstants.filtersPerPayload;
-      final filtersForPayload = <FilterEntity>[
-        ...config.filters.skip(startIndex).take(AppConstants.filtersPerPayload),
-      ];
+    // ID 1: Filters 1-4
+    final set1 = _assemblePayload(1, [
+      _methodToCode(config.method),
+      config.filterCount.toString(),
+      ..._timeToParts(config.filters.length > 0 ? config.filters[0] : const FilterEntity(hour: 0, minute: 0, second: 0)),
+      ..._timeToParts(config.filters.length > 1 ? config.filters[1] : const FilterEntity(hour: 0, minute: 0, second: 0)),
+      ..._timeToParts(config.filters.length > 2 ? config.filters[2] : const FilterEntity(hour: 0, minute: 0, second: 0)),
+      ..._timeToParts(config.filters.length > 3 ? config.filters[3] : const FilterEntity(hour: 0, minute: 0, second: 0)),
+    ]);
 
-      while (filtersForPayload.length < AppConstants.filtersPerPayload) {
-        filtersForPayload.add(
-          const FilterEntity(hour: 0, minute: 0, second: 0),
-        );
-      }
+    // ID 2: Filters 5-8
+    final set2 = _assemblePayload(2, [
+      _methodToCode(config.method),
+      config.filterCount.toString(),
+      ..._timeToParts(config.filters.length > 4 ? config.filters[4] : const FilterEntity(hour: 0, minute: 0, second: 0)),
+      ..._timeToParts(config.filters.length > 5 ? config.filters[5] : const FilterEntity(hour: 0, minute: 0, second: 0)),
+      ..._timeToParts(config.filters.length > 6 ? config.filters[6] : const FilterEntity(hour: 0, minute: 0, second: 0)),
+      ..._timeToParts(config.filters.length > 7 ? config.filters[7] : const FilterEntity(hour: 0, minute: 0, second: 0)),
+    ]);
 
-      final parts = <String>[
-        _methodToCode(config.method),
-        config.filterCount.toString(),
-        for (final filter in filtersForPayload) ..._timeToParts(filter),
-      ];
+    // ID 3: Common Parameters (OffTime, InitialDelay, DelayBetween, DpScanTime)
+    final set3 = _assemblePayload(3, [
+      _methodToCode(config.method),
+      config.filterCount.toString(),
+      ..._timeToParts(config.offTime),
+      ..._timeToParts(config.initialDelay),
+      ..._timeToParts(config.delayBetween),
+      ..._timeToParts(config.dpScanTime),
+    ]);
 
-      return _assemblePayload(payloadIndex + 1, parts);
-    });
+    return [set1, set2, set3];
   }
 
+  /// Request View Settings (ID 4)
+  /// Result: $:5:4:59:\r
   static List<int> buildViewSettingsRequest() => _assemblePayload(4, []);
+
+  /// Request Live Status (ID 5)
+  /// Result: $:5:5:60:\r
   static List<int> buildLiveRequest() => _assemblePayload(5, []);
+
   static List<int> buildStartCommand() => _assemblePayload(6, ['0']);
   static List<int> buildStopCommand() => _assemblePayload(7, ['0']);
 
-  /// Assembles the parts into the final byte array with correct terminator
+  /// Assembles segments into the final byte array.
+  /// Format: $:Len:ID:Data:CRC:\r
   static List<int> _assemblePayload(int payloadId, List<String> dataParts) {
     List<String> allParts = [payloadId.toString(), ...dataParts];
 
-    // MsgLength = ID + DataFields + CRC + LengthField itself
-    int msgLength = allParts.length + 2;
+    // msgLength is the segment count (including $, Len, ID, Data segments, CRC, and empty trailer)
+    // For $:5:5:60:\r, colons split into: [$, 5, 5, 60, ""] -> 5 segments.
+    // dataParts count + ID(1) + 4 extra ($ segment, Len segment, CRC segment, trailer segment)
+    int msgLength = allParts.length + 4;
     allParts.insert(0, msgLength.toString());
 
-    int crc = _calculateCrc(allParts);
-    allParts.add(crc.toString());
-
-    // RESTORE PREVIOUS WORKING FORMAT
-    // Build the string with colons and append \r exactly as it was yesterday
-    String payloadStr = '\$:${allParts.join(':')}:\r';
+    final payloadWithoutCrc = '\$:${allParts.join(':')}:';
+    final crc = _calculateCrc(payloadWithoutCrc);
+    
+    final payloadStr = '$payloadWithoutCrc$crc:\r';
 
     if (kDebugMode) {
-      print('--- CONFIG PAYLOAD (ID: $payloadId) ---');
+      print('--- OUTGOING PAYLOAD (ID: $payloadId) ---');
       print('String: ${payloadStr.replaceAll('\r', r'\r')}');
     }
 
@@ -74,14 +90,15 @@ class PayloadBuilder {
       case 'Both':
         return '2';
       default:
-        return '0';
+        return '0'; // Time Based
     }
   }
 
-  static int _calculateCrc(List<String> parts) {
+  /// CRC is the sum of ASCII values of all characters modulo 256.
+  static int _calculateCrc(String payloadWithoutCrc) {
     int sum = 0;
-    for (var part in parts) {
-      sum += (double.tryParse(part)?.toInt() ?? 0);
+    for (final codeUnit in payloadWithoutCrc.codeUnits) {
+      sum += codeUnit;
     }
     return sum % 256;
   }

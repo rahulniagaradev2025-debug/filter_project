@@ -43,4 +43,5 @@ class BluetoothManager {
   void dispose() {
     _stateController.close();
   }
+
 }
