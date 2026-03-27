@@ -10,9 +10,24 @@ class AppBluetoothService {
   
   fbp.BluetoothDevice? _connectedDevice;
   fbp.BluetoothCharacteristic? _writeCharacteristic;
-  fbp.BluetoothCharacteristic? _readCharacteristic;
+  final List<StreamSubscription> _notifySubscriptions = [];
+
+  // Global history of logs
+  final List<LogEntry> _logHistory = [];
+  List<LogEntry> get logHistory => List.unmodifiable(_logHistory);
+
+  // Global stream for all data (Sent and Received)
+  final _dataLogController = StreamController<LogEntry>.broadcast();
+  Stream<LogEntry> get dataLogStream => _dataLogController.stream;
+
+  // Stable notifications stream for the parser and UI listeners
+  final _notificationController = StreamController<List<int>>.broadcast();
 
   Future<void> startScan() async {
+    if (await fbp.FlutterBluePlus.adapterState.first != fbp.BluetoothAdapterState.on) {
+      throw Exception("Bluetooth is off");
+    }
+
     if (await fbp.FlutterBluePlus.isScanningNow == false) {
       await fbp.FlutterBluePlus.startScan(
         timeout: const Duration(seconds: 15),
@@ -26,13 +41,23 @@ class AppBluetoothService {
   }
 
   Future<void> connect(fbp.BluetoothDevice device) async {
-    if (device.isConnected) return;
-    
+    if (_connectedDevice != null && _connectedDevice!.remoteId != device.remoteId) {
+      await disconnect();
+    }
+
     try {
-      await device.connect(timeout: const Duration(seconds: 10), autoConnect: false);
+      await device.connect(
+        timeout: const Duration(seconds: 15), 
+        autoConnect: false,
+      );
+      
       _connectedDevice = device;
-      _writeCharacteristic = null;
-      _readCharacteristic = null;
+      
+      device.connectionState.listen((state) {
+        if (state == fbp.BluetoothConnectionState.disconnected) {
+          _cleanupConnection();
+        }
+      });
 
       if (Platform.isAndroid) {
         try {
@@ -46,65 +71,125 @@ class AppBluetoothService {
       List<fbp.BluetoothService> services = await device.discoverServices();
       _logDiscoveredServices(services);
 
+      // Select Write Characteristic
       _writeCharacteristic = _selectCharacteristic(
         services,
         preferredServiceUuid: AppConstants.preferredBleServiceUuid,
         preferredCharacteristicUuid: AppConstants.preferredBleWriteCharacteristicUuid,
-        supportsCharacteristic: (characteristic) =>
-            characteristic.properties.write ||
-            characteristic.properties.writeWithoutResponse,
-      );
-
-      _readCharacteristic = _selectCharacteristic(
-        services,
-        preferredServiceUuid: AppConstants.preferredBleServiceUuid,
-        preferredCharacteristicUuid: AppConstants.preferredBleNotifyCharacteristicUuid,
-        supportsCharacteristic: (characteristic) =>
-            characteristic.properties.notify ||
-            characteristic.properties.indicate,
+        supportsCharacteristic: _supportsWrite,
       );
 
       if (_writeCharacteristic == null) {
-        throw Exception("No writable BLE characteristic found on the device.");
+        throw Exception("No writable BLE characteristic found.");
       }
 
-      if (_readCharacteristic != null) {
-        await _readCharacteristic!.setNotifyValue(true);
-        debugPrint("Subscribed to Notify Characteristic: ${_readCharacteristic!.uuid}");
+      // Step 1: Identify all notify characteristics
+      final notifyChars = <fbp.BluetoothCharacteristic>[];
+      for (final service in services) {
+        for (final characteristic in service.characteristics) {
+          if (_supportsNotify(characteristic)) {
+            notifyChars.add(characteristic);
+          }
+        }
       }
+
+      // Step 2: Attach listeners FIRST before enabling notifications
+      for (final characteristic in notifyChars) {
+        final sub = characteristic.onValueReceived.listen((data) {
+          final text = utf8.decode(data, allowMalformed: true);
+          debugPrint('BLE RX: $text');
+          
+          final entry = LogEntry(text: text, isResponse: true);
+          _logHistory.add(entry);
+          _dataLogController.add(entry);
+          _notificationController.add(data);
+        });
+        _notifySubscriptions.add(sub);
+      }
+
+      // Step 3: Enable notifications on the characteristics
+      for (final characteristic in notifyChars) {
+        try {
+          await characteristic.setNotifyValue(true);
+          debugPrint('Notifications enabled for: ${characteristic.uuid}');
+          // Small delay between descriptor writes to avoid GATT congestion
+          await Future.delayed(const Duration(milliseconds: 200));
+        } catch (e) {
+          debugPrint('Failed to enable notify for ${characteristic.uuid}: $e');
+        }
+      }
+
     } catch (e) {
       await device.disconnect();
+      _cleanupConnection();
       rethrow;
     }
   }
 
-  Future<void> disconnect() async {
-    await _connectedDevice?.disconnect();
+  void _cleanupConnection() {
+    for (final sub in _notifySubscriptions) {
+      sub.cancel();
+    }
+    _notifySubscriptions.clear();
     _connectedDevice = null;
     _writeCharacteristic = null;
-    _readCharacteristic = null;
+  }
+
+  Future<void> disconnect() async {
+    if (_connectedDevice != null) {
+      await _connectedDevice!.disconnect();
+    }
+    _cleanupConnection();
   }
 
   Future<void> writeData(List<int> data) async {
     if (_writeCharacteristic != null) {
       bool canWriteWithoutResponse = _writeCharacteristic!.properties.writeWithoutResponse;
       await _writeCharacteristic!.write(data, withoutResponse: canWriteWithoutResponse);
+      
+      final text = utf8.decode(data, allowMalformed: true);
+      debugPrint('BLE TX: $text');
+      
+      final entry = LogEntry(text: text, isResponse: false);
+      _logHistory.add(entry);
+      _dataLogController.add(entry);
     } else {
-      throw Exception("Device not ready for writing.");
+      throw Exception("Device not connected or not ready.");
     }
   }
 
   Stream<List<int>> subscribeToNotifications() {
-    if (_readCharacteristic == null) return const Stream.empty();
-    return _readCharacteristic!.onValueReceived.map((data) {
-      if (kDebugMode) {
-        print('--- DATA RECEIVED FROM HARDWARE ---');
-        print('Raw Bytes: $data');
-        print('String: ${utf8.decode(data, allowMalformed: true)}');
-        print('------------------------------------');
+    return _notificationController.stream;
+  }
+
+  void clearLogs() {
+    _logHistory.clear();
+  }
+
+  bool _supportsWrite(fbp.BluetoothCharacteristic characteristic) {
+    return characteristic.properties.write ||
+        characteristic.properties.writeWithoutResponse;
+  }
+
+  bool _supportsNotify(fbp.BluetoothCharacteristic characteristic) {
+    return characteristic.properties.notify ||
+        characteristic.properties.indicate;
+  }
+
+  void _logDiscoveredServices(List<fbp.BluetoothService> services) {
+    for (final service in services) {
+      debugPrint('BLE service discovered: ${service.uuid}');
+      for (final characteristic in service.characteristics) {
+        debugPrint(
+          '  characteristic ${characteristic.uuid} '
+          '[read=${characteristic.properties.read}, '
+          'write=${characteristic.properties.write}, '
+          'writeNoResp=${characteristic.properties.writeWithoutResponse}, '
+          'notify=${characteristic.properties.notify}, '
+          'indicate=${characteristic.properties.indicate}]',
+        );
       }
-      return data;
-    });
+    }
   }
 
   fbp.BluetoothCharacteristic? _selectCharacteristic(
@@ -114,29 +199,18 @@ class AppBluetoothService {
     required bool Function(fbp.BluetoothCharacteristic characteristic)
         supportsCharacteristic,
   }) {
-    final normalizedServiceUuid = _normalizeUuid(preferredServiceUuid);
-    final normalizedCharacteristicUuid =
-        _normalizeUuid(preferredCharacteristicUuid);
+    final normalizedServiceUuid = preferredServiceUuid.trim().toLowerCase();
+    final normalizedCharacteristicUuid = preferredCharacteristicUuid.trim().toLowerCase();
 
     for (final service in services) {
-      final serviceUuid = _normalizeUuid(service.uuid.toString());
-      final serviceMatches = normalizedServiceUuid.isEmpty ||
-          serviceUuid == normalizedServiceUuid;
-      if (!serviceMatches) {
-        continue;
-      }
+      final serviceUuid = service.uuid.toString().toLowerCase();
+      if (normalizedServiceUuid.isNotEmpty && serviceUuid != normalizedServiceUuid) continue;
 
       for (final characteristic in service.characteristics) {
-        final characteristicUuid =
-            _normalizeUuid(characteristic.uuid.toString());
-        final characteristicMatches = normalizedCharacteristicUuid.isEmpty ||
-            characteristicUuid == normalizedCharacteristicUuid;
+        final characteristicUuid = characteristic.uuid.toString().toLowerCase();
+        if (normalizedCharacteristicUuid.isNotEmpty && characteristicUuid != normalizedCharacteristicUuid) continue;
 
-        if (characteristicMatches &&
-            supportsCharacteristic(characteristic)) {
-          debugPrint(
-            "Selected Characteristic ${characteristic.uuid} from service ${service.uuid}",
-          );
+        if (supportsCharacteristic(characteristic)) {
           return characteristic;
         }
       }
@@ -145,37 +219,18 @@ class AppBluetoothService {
     for (final service in services) {
       for (final characteristic in service.characteristics) {
         if (supportsCharacteristic(characteristic)) {
-          debugPrint(
-            "Falling back to Characteristic ${characteristic.uuid} from service ${service.uuid}",
-          );
           return characteristic;
         }
       }
     }
-
     return null;
   }
+}
 
-  String _normalizeUuid(String uuid) => uuid.trim().toLowerCase();
+class LogEntry {
+  final String text;
+  final DateTime timestamp;
+  final bool isResponse;
 
-  void _logDiscoveredServices(List<fbp.BluetoothService> services) {
-    if (!kDebugMode) {
-      return;
-    }
-
-    debugPrint('--- DISCOVERED BLE SERVICES ---');
-    for (final service in services) {
-      debugPrint('Service: ${service.uuid}');
-      for (final characteristic in service.characteristics) {
-        debugPrint(
-          '  Characteristic: ${characteristic.uuid} '
-          '[write=${characteristic.properties.write}, '
-          'writeWithoutResponse=${characteristic.properties.writeWithoutResponse}, '
-          'notify=${characteristic.properties.notify}, '
-          'indicate=${characteristic.properties.indicate}]',
-        );
-      }
-    }
-    debugPrint('-------------------------------');
-  }
+  LogEntry({required this.text, required this.isResponse}) : timestamp = DateTime.now();
 }

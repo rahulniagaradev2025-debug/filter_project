@@ -146,29 +146,36 @@ class _ConfigPageState extends State<ConfigPage> {
 
     final picked = await showModalBottomSheet<Duration>(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return Container(
-          height: 300,
-          color: Colors.white,
+          height: 350,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
+          ),
           child: Column(
             children: [
               Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                height: 60,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                  border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
+                      child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontSize: 16)),
                     ),
+                    const Text('Select Duration', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     TextButton(
                       onPressed: () => Navigator.pop(context, tempDuration),
-                      child: const Text('Done'),
+                      child: const Text('Done', style: TextStyle(color: Color(0xFF2F80ED), fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -231,129 +238,118 @@ class _ConfigPageState extends State<ConfigPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<ConfigBloc, ConfigState>(
-      listener: (context, state) {
-        if (state is ConfigSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Configuration saved and sent successfully'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-          widget.onNavigateDashboard?.call();
-        } else if (state is ConfigError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${state.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      },
-      child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+    return Scaffold(
+      backgroundColor: const Color(0xFFEAF5FF),
+      body: BlocListener<ConfigBloc, ConfigState>(
+        listener: (context, state) {
+          if (state is ConfigSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Configuration saved and sent successfully'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.green,
+              ),
+            );
+            widget.onNavigateDashboard?.call();
+          } else if (state is ConfigError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error: ${state.message}'),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+        child: SafeArea(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(),
-              const SizedBox(height: 26),
-              const Text('General Settings', style: _sectionTitleStyle),
-              const SizedBox(height: 12),
-              _buildDropdownField(),
-              const SizedBox(height: 10),
-              _buildTextFieldCard(
-                controller: _filterCountController,
-                label: 'Enter number of relays(1-8)',
-                keyboardType: TextInputType.number,
-                onChanged: _onFilterCountChanged,
-              ),
-              const SizedBox(height: 18),
-              if (_filterCount > 0) ...[
-                for (var i = 0; i < _filterCount; i++) ...[
-                  Text('Filter ${i + 1}', style: _sectionTitleStyle),
-                  const SizedBox(height: 10),
-                  _buildTimeField(
-                    label: 'Filter ${i + 1} On Time',
-                    value: _formatTime(_filters[i]),
-                    onTap: () => _pickFilterTime(i),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ],
-              const Text('Common Settings', style: _sectionTitleStyle),
-              const SizedBox(height: 10),
-              _buildTimeField(
-                label: 'Filter Off Time',
-                value: _formatTime(_offTime),
-                onTap: () => _pickCommonTime(
-                  _offTime,
-                  (value) => _offTime = value,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildTimeField(
-                label: 'Filter Initial Delay',
-                value: _formatTime(_initialDelay),
-                onTap: () => _pickCommonTime(
-                  _initialDelay,
-                  (value) => _initialDelay = value,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildTimeField(
-                label: 'Filter Delay Between',
-                value: _formatTime(_delayBetween),
-                onTap: () => _pickCommonTime(
-                  _delayBetween,
-                  (value) => _delayBetween = value,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildTimeField(
-                label: 'Filter Dp Scan Time',
-                value: _formatTime(_dpScanTime),
-                onTap: () => _pickCommonTime(
-                  _dpScanTime,
-                  (value) => _dpScanTime = value,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _buildTextFieldCard(
-                controller: _flowController,
-                label: 'Calc Flow 3Phase',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: BlocBuilder<ConfigBloc, ConfigState>(
-                  builder: (context, state) {
-                    return ElevatedButton(
-                      onPressed: state is ConfigLoading ? null : _saveAndSendConfig,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2F80ED),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionHeader('General Settings'),
+                      _buildDropdownField(),
+                      const SizedBox(height: 12),
+                      _buildTextFieldCard(
+                        controller: _filterCountController,
+                        label: 'Number of Relays',
+                        hint: 'Enter 1-8',
+                        keyboardType: TextInputType.number,
+                        onChanged: _onFilterCountChanged,
+                        icon: Icons.numbers_rounded,
                       ),
-                      child: state is ConfigLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Save Settings',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                      const SizedBox(height: 24),
+                      if (_filterCount > 0) ...[
+                        _buildSectionHeader('Filter Settings'),
+                        ...List.generate(_filterCount, (i) => Column(
+                          children: [
+                            _buildTimeField(
+                              label: 'Filter ${i + 1} On Time',
+                              value: _formatTime(_filters[i]),
+                              onTap: () => _pickFilterTime(i),
+                              icon: Icons.timer_outlined,
                             ),
-                    );
-                  },
+                            const SizedBox(height: 12),
+                          ],
+                        )),
+                        const SizedBox(height: 12),
+                      ],
+                      _buildSectionHeader('Common Settings'),
+                      _buildTimeField(
+                        label: 'Filter Off Time',
+                        value: _formatTime(_offTime),
+                        onTap: () => _pickCommonTime(
+                          _offTime,
+                          (value) => _offTime = value,
+                        ),
+                        icon: Icons.power_settings_new_rounded,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTimeField(
+                        label: 'Initial Delay',
+                        value: _formatTime(_initialDelay),
+                        onTap: () => _pickCommonTime(
+                          _initialDelay,
+                          (value) => _initialDelay = value,
+                        ),
+                        icon: Icons.hourglass_top_rounded,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTimeField(
+                        label: 'Delay Between',
+                        value: _formatTime(_delayBetween),
+                        onTap: () => _pickCommonTime(
+                          _delayBetween,
+                          (value) => _delayBetween = value,
+                        ),
+                        icon: Icons.sync_problem_rounded,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTimeField(
+                        label: 'DP Scan Time',
+                        value: _formatTime(_dpScanTime),
+                        onTap: () => _pickCommonTime(
+                          _dpScanTime,
+                          (value) => _dpScanTime = value,
+                        ),
+                        icon: Icons.analytics_outlined,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildTextFieldCard(
+                        controller: _flowController,
+                        label: 'Calc Flow 3Phase',
+                        hint: 'Enter value',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        icon: Icons.waves_rounded,
+                      ),
+                      const SizedBox(height: 40),
+                      _buildSaveButton(),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -364,43 +360,65 @@ class _ConfigPageState extends State<ConfigPage> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      children: [
-        IconButton(
-          onPressed: widget.onNavigateDashboard,
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-        ),
-        const Expanded(
-          child: Text(
-            'Device Configuration',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: widget.onNavigateDashboard,
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF1E232C)),
           ),
+          const Expanded(
+            child: Text(
+              'Configuration',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 20, 
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E232C),
+              ),
+            ),
+          ),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 12, top: 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF1E232C),
         ),
-        const SizedBox(width: 48),
-      ],
+      ),
     );
   }
 
   Widget _buildDropdownField() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: _cardDecoration(),
       child: DropdownButtonFormField<String>(
         value: _selectedMethod,
+        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF2F80ED)),
         decoration: const InputDecoration(
           labelText: 'Filter Method',
+          labelStyle: TextStyle(color: Color(0xFF6A707C)),
           border: InputBorder.none,
+          prefixIcon: Icon(Icons.settings_suggest_rounded, color: Color(0xFF2F80ED)),
         ),
         items: const [
-          DropdownMenuItem(value: 'Time', child: Text('Time')),
-          DropdownMenuItem(value: 'DP', child: Text('DP')),
-          DropdownMenuItem(value: 'Both', child: Text('Both')),
+          DropdownMenuItem(value: 'Time', child: Text('Time Based')),
+          DropdownMenuItem(value: 'DP', child: Text('DP Based')),
+          DropdownMenuItem(value: 'Both', child: Text('Both (Time & DP)')),
         ],
         onChanged: (value) {
-          if (value == null) {
-            return;
-          }
+          if (value == null) return;
           setState(() => _selectedMethod = value);
         },
       ),
@@ -411,36 +429,40 @@ class _ConfigPageState extends State<ConfigPage> {
     required String label,
     required String value,
     required VoidCallback onTap,
+    required IconData icon,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: _cardDecoration(),
         child: Row(
           children: [
+            Icon(icon, color: const Color(0xFF2F80ED), size: 22),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF2D2D2D),
+                  fontSize: 15,
+                  color: Color(0xFF1E232C),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFD9D9D9)),
+                color: const Color(0xFF2F80ED).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 value,
                 style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF8A8A8A),
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2F80ED),
+                  fontSize: 14,
                 ),
               ),
             ),
@@ -453,20 +475,61 @@ class _ConfigPageState extends State<ConfigPage> {
   Widget _buildTextFieldCard({
     required TextEditingController controller,
     required String label,
+    required String hint,
+    required IconData icon,
     TextInputType? keyboardType,
     ValueChanged<String>? onChanged,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: _cardDecoration(),
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
         onChanged: onChanged,
+        style: const TextStyle(fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           labelText: label,
+          hintText: hint,
+          labelStyle: const TextStyle(color: Color(0xFF6A707C)),
           border: InputBorder.none,
+          prefixIcon: Icon(icon, color: const Color(0xFF2F80ED)),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: BlocBuilder<ConfigBloc, ConfigState>(
+        builder: (context, state) {
+          return ElevatedButton(
+            onPressed: state is ConfigLoading ? null : _saveAndSendConfig,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2F80ED),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: state is ConfigLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'Save & Send Configuration',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+          );
+        },
       ),
     );
   }
@@ -474,14 +537,14 @@ class _ConfigPageState extends State<ConfigPage> {
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFFA6D6FF)),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.03),
+          blurRadius: 10,
+          offset: const Offset(0, 4),
+        ),
+      ],
     );
   }
 }
-
-const _sectionTitleStyle = TextStyle(
-  fontSize: 15,
-  fontWeight: FontWeight.w500,
-  color: Color(0xFF303030),
-);

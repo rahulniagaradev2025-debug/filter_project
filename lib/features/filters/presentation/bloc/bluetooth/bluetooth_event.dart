@@ -18,3 +18,12 @@ class ConnectDeviceEvent extends BluetoothEvent {
 }
 
 class DisconnectDeviceEvent extends BluetoothEvent {}
+
+class BluetoothStatusChangedEvent extends BluetoothEvent {
+  final BluetoothConnectionState state;
+  final BluetoothDevice device;
+  const BluetoothStatusChangedEvent(this.state, this.device);
+
+  @override
+  List<Object> get props => [state, device];
+}

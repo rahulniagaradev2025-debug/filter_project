@@ -11,7 +11,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _mobileController = TextEditingController(text: '6121321231');
+  final _mobileController = TextEditingController(text: '1234567890');
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -38,7 +38,7 @@ class _LoginPageState extends State<LoginPage> {
     // DUMMY AUTHENTICATION LOGIC
     // 1. Check against saved credentials (from Recovery page)
     // 2. Or fallback to default dummy credentials
-    final savedMobile = AuthPreferences.instance.getSavedMobile() ?? "6121321231";
+    final savedMobile = AuthPreferences.instance.getSavedMobile() ?? "1234567890";
     final savedPass = AuthPreferences.instance.getSavedPassword() ?? "12345678";
 
     bool isAuthenticated = (mobile == savedMobile && password == savedPass);
@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Invalid credentials. Try 6121321231 / 12345678'),
+          content: Text('Invalid credentials. '),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),

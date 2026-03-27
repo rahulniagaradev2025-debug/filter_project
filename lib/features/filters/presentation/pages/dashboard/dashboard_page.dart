@@ -13,6 +13,7 @@ import '../../widgets/app_bottom_nav.dart';
 import '../bluetooth/bluetooth_page.dart';
 import '../config/config_page.dart';
 import '../report/report_page.dart';
+import 'send_receive_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -72,6 +73,7 @@ class _DashboardHome extends StatefulWidget {
 
 class _DashboardHomeState extends State<_DashboardHome> {
   Map<String, dynamic> _lastParsedData = {};
+  String _latestBleResponse = 'Waiting for device response...';
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +84,7 @@ class _DashboardHomeState extends State<_DashboardHome> {
             if (state is exec.ExecutionStatusUpdate) {
               final data = PayloadParser.parseRaw(state.status);
               setState(() {
+                _latestBleResponse = state.status.replaceAll('\r', r'\r');
                 if (data['type'] == 'live' || data['type'] == 'settings') {
                   _lastParsedData = data;
                   
@@ -117,6 +120,8 @@ class _DashboardHomeState extends State<_DashboardHome> {
                       _ActionButtons(),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  _ResponseCard(response: _latestBleResponse),
                   const SizedBox(height: 16),
                   Expanded(
                     child: filterCount == 0
@@ -146,6 +151,16 @@ class _DashboardHomeState extends State<_DashboardHome> {
   Widget _buildHeader(BuildContext context) {
     return Row(
       children: [
+        IconButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SendReceivePage()),
+            );
+          },
+          icon: const Icon(Icons.history_edu_rounded, color: Color(0xFF2F80ED)),
+          tooltip: 'Send & Receive Logs',
+        ),
         const Spacer(),
         const Text(
           'Dashboard',
@@ -204,6 +219,47 @@ class _DashboardHomeState extends State<_DashboardHome> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResponseCard extends StatelessWidget {
+  final String response;
+
+  const _ResponseCard({required this.response});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFD7E6F5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Device Response',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF2F80ED),
+            ),
+          ),
+          const SizedBox(height: 6),
+          SelectableText(
+            response,
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 13,
+              color: Color(0xFF2D2D2D),
+            ),
           ),
         ],
       ),
