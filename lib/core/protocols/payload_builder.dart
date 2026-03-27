@@ -71,7 +71,7 @@ class PayloadBuilder {
   static List<int> _assemblePayload(int payloadId, List<String> dataParts) {
     final payloadWithoutCrc = _buildPayloadWithoutCrc(payloadId, dataParts);
     final crc = _calculateCrc(payloadWithoutCrc);
-    final payloadStr = '$payloadWithoutCrc$crc:\r';
+    final payloadStr = '$payloadWithoutCrc$crc:\r\n';
 
     if (kDebugMode) {
       print('--- OUTGOING PAYLOAD (ID: $payloadId) ---');

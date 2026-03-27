@@ -4,22 +4,22 @@ class AppConstants {
   static const String protocolEnd = '\r';
 
   // BLE Hardware UUIDs
-  static const String preferredBleServiceUuid = "12345678-1234-5678-1234-56789abcdef0";
+  static const String preferredBleServiceUuid = "49535343-8841-43f4-a8d4-ecbe34729bb3";
   
   // App Mode (Settings/Config)
-  static const String preferredBleWriteCharacteristicUuid = "12345678-1234-5678-1234-56789abcdef1";
-  static const String preferredBleNotifyCharacteristicUuid = "12345678-1234-5678-1234-56789abcdef2";
+  static const String preferredBleWriteCharacteristicUuid = "49535343-8841-43f4-a8d4-ecbe34729bb3";
+  static const String preferredBleNotifyCharacteristicUuid = "49535343-8841-43f4-a8d4-ecbe34729bb3";
 
   // Terminal Mode (Raw Console)
-  static const String terminalWriteUuid = "12345678-1234-5678-1234-56789abcdef3";
-  static const String terminalNotifyUuid = "12345678-1234-5678-1234-56789abcdef4";
+  static const String terminalWriteUuid = "49535343-8841-43f4-a8d4-ecbe34729bb3";
+  static const String terminalNotifyUuid = "49535343-8841-43f4-a8d4-ecbe34729bb3";
 
   // Configuration
   static const int maxFilterCount = 8;
   static const int filtersPerPayload = 4;
   static const int bluetoothScanTimeout = 15;
-  static const int bleWriteChunkSize = 20;
-  static const int bleWriteChunkDelayMs = 40;
+  static const int bleWriteChunkSize = 244;
+  static const int bleWriteChunkDelayMs = 10;
 
   // UI Spacing
   static const double defaultPadding = 16.0;

@@ -21,6 +21,8 @@ dependencies:
   path_provider: ^2.1.2
   share_plus: ^7.2.2
   intl: ^0.20.2
+  sqflite: ^2.3.0
+  path: ^1.9.0
 
 dev_dependencies:
   flutter_test:
@@ -32,4 +34,3 @@ flutter:
   assets:
     - assests/icons/
     - assests/images/
-

@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart' as fbp;
 import 'package:filter_project/core/utils/constants.dart';
+import 'package:filter_project/core/storage/database_helper.dart';
 
 class AppBluetoothService {
+  final DatabaseHelper _dbHelper = DatabaseHelper();
   Stream<List<fbp.ScanResult>> get scanResults => fbp.FlutterBluePlus.scanResults;
   
   fbp.BluetoothDevice? _connectedDevice;
@@ -23,6 +25,28 @@ class AppBluetoothService {
 
   // Stable notifications stream for the parser and UI listeners
   final _notificationController = StreamController<List<int>>.broadcast();
+
+  AppBluetoothService() {
+    _loadLogsFromDatabase();
+  }
+
+  Future<void> _loadLogsFromDatabase() async {
+    try {
+      final dbLogs = await _dbHelper.getLogs();
+      final entries = dbLogs.map((map) => LogEntry(
+        text: map['text'],
+        isResponse: map['isResponse'] == 1,
+        timestamp: DateTime.parse(map['timestamp']),
+      )).toList();
+      
+      _logHistory.addAll(entries.reversed);
+      for (final entry in entries.reversed) {
+        _dataLogController.add(entry);
+      }
+    } catch (e) {
+      debugPrint("Error loading logs from DB: $e");
+    }
+  }
 
   Future<void> startScan() async {
     if (await fbp.FlutterBluePlus.adapterState.first != fbp.BluetoothAdapterState.on) {
@@ -63,15 +87,25 @@ class AppBluetoothService {
       if (Platform.isAndroid) {
         try {
           await device.requestMtu(512);
-          await Future.delayed(const Duration(milliseconds: 500));
+          await Future.delayed(const Duration(milliseconds: 200));
         } catch (e) {
           debugPrint("MTU Request failed: $e");
         }
       }
       
       List<fbp.BluetoothService> services = await device.discoverServices();
+      for (var s in services) {
+        for (var c in s.characteristics) {
+          final uuid = c.uuid.toString().toLowerCase();
+          if(c.properties.notify){
+            c.setNotifyValue(true);
+          }
+          c.lastValueStream.listen((value){
+            print("value ($uuid)=> $value");
+          });
+        }
+      }
 
-      // 🔥 SELECT WRITE & NOTIFY CHARACTERISTICS
       _writeCharacteristic = _selectWriteChar(services);
       final notifyChars = _selectAllNotifyChars(services);
 
@@ -80,7 +114,6 @@ class AppBluetoothService {
         _writeCharacteristic = _selectFallbackWriteChar(services);
       }
 
-      // Step 1: Attach listeners to all notify characteristics
       for (final characteristic in notifyChars) {
         final sub = characteristic.onValueReceived.listen((data) {
           if (data.isEmpty) return;
@@ -94,12 +127,11 @@ class AppBluetoothService {
         _notifySubscriptions.add(sub);
       }
 
-      // Step 2: Enable notifications
       for (final characteristic in notifyChars) {
         try {
           await characteristic.setNotifyValue(true);
           debugPrint('Notifications enabled for: ${characteristic.uuid}');
-          await Future.delayed(const Duration(milliseconds: 200));
+          await Future.delayed(const Duration(milliseconds: 50));
         } catch (e) {
           debugPrint('Failed to enable notify for ${characteristic.uuid}: $e');
         }
@@ -135,11 +167,11 @@ class AppBluetoothService {
       throw Exception("Device not connected or not ready.");
     }
 
-    final writeWithoutResponse =
-        !characteristic.properties.write &&
-        characteristic.properties.writeWithoutResponse;
+    final writeWithoutResponse = characteristic.properties.writeWithoutResponse;
+    final currentMtu = _connectedDevice?.mtuNow ?? AppConstants.bleWriteChunkSize;
+    final effectiveChunkSize = currentMtu - 3; 
 
-    final chunks = _splitIntoChunks(data, AppConstants.bleWriteChunkSize);
+    final chunks = _splitIntoChunks(data, effectiveChunkSize);
 
     for (var i = 0; i < chunks.length; i++) {
       await characteristic.write(
@@ -163,6 +195,9 @@ class AppBluetoothService {
     final entry = LogEntry(text: text, isResponse: false);
     _logHistory.add(entry);
     _dataLogController.add(entry);
+    
+    // Persist to SQLite
+    _dbHelper.insertLog(text, false);
   }
 
   Stream<List<int>> subscribeToNotifications() {
@@ -171,6 +206,7 @@ class AppBluetoothService {
 
   void clearLogs() {
     _logHistory.clear();
+    _dbHelper.clearAllLogs();
   }
 
   fbp.BluetoothCharacteristic? _selectWriteChar(List<fbp.BluetoothService> services) {
@@ -180,6 +216,9 @@ class AppBluetoothService {
     for (var s in services) {
       for (var c in s.characteristics) {
         final uuid = c.uuid.toString().toLowerCase();
+        c.lastValueStream.listen((value){
+          print("value => $value");
+        });
         if (uuid == writeUuid || uuid == termUuid) {
           return c;
         }
@@ -317,6 +356,9 @@ class AppBluetoothService {
     _logHistory.add(entry);
     _dataLogController.add(entry);
     _notificationController.add(utf8.encode(normalized));
+    
+    // Persist to SQLite
+    _dbHelper.insertLog(normalized, true);
   }
 }
 
@@ -325,5 +367,6 @@ class LogEntry {
   final DateTime timestamp;
   final bool isResponse;
 
-  LogEntry({required this.text, required this.isResponse}) : timestamp = DateTime.now();
+  LogEntry({required this.text, required this.isResponse, DateTime? timestamp}) 
+    : timestamp = timestamp ?? DateTime.now();
 }
