@@ -1,55 +1,52 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../utils/constants.dart';
 import '../../features/filters/data/models/filter_config_model.dart';
 import '../../features/filters/domain/entities/filter_entity.dart';
 
 class PayloadBuilder {
-  /// Builds 3 separate payloads for filter configuration (Set 1, 2, and 3).
-  /// To ensure hardware response, all three payloads include the common settings
-  /// to maintain a consistent message length and structure.
+  /// Builds the 3 hardware configuration payloads:
+  /// 1. Filters 1-4
+  /// 2. Filters 5-8
+  /// 3. Common timing / DP settings
   static List<List<int>> buildConfigPayloads(FilterConfigModel config) {
-    final allFilters = List<FilterEntity>.from(config.filters);
-    // Support up to 12 filters (3 sets of 4)
-    while (allFilters.length < 12) {
+    final allFilters = List<FilterEntity>.from(
+      config.filters.take(AppConstants.maxFilterCount),
+    );
+    while (allFilters.length < AppConstants.maxFilterCount) {
       allFilters.add(const FilterEntity(hour: 0, minute: 0, second: 0));
     }
 
     final method = _methodToCode(config.method);
-    final count = config.filterCount.toString();
+    final safeCount = config.filterCount.clamp(0, AppConstants.maxFilterCount);
+    final count = safeCount.toString();
 
-    // These common settings are appended to every config payload
-    // to satisfy the hardware's expected fixed-length format.
-    final commonSettings = [
+    final data1 = [
+      method,
+      count,
+      for (final filter in allFilters.sublist(0, AppConstants.filtersPerPayload))
+        ..._timeToParts(filter),
+    ];
+
+    final data2 = [
+      method,
+      count,
+      for (final filter in allFilters.sublist(
+        AppConstants.filtersPerPayload,
+        AppConstants.maxFilterCount,
+      ))
+        ..._timeToParts(filter),
+    ];
+
+    final data3 = [
+      method,
+      count,
       ..._timeToParts(config.offTime),
       ..._timeToParts(config.initialDelay),
       ..._timeToParts(config.delayBetween),
       ..._timeToParts(config.dpScanTime),
       ..._timeToParts(config.afterFilterDpScanTime),
       config.dpDifferenceValue.toStringAsFixed(0),
-    ];
-
-    // Set 1 (ID: 1): Filters 1-4 + Common Settings
-    final data1 = [
-      method,
-      count,
-      for (final filter in allFilters.sublist(0, 4)) ..._timeToParts(filter),
-      ...commonSettings,
-    ];
-
-    // Set 2 (ID: 2): Filters 5-8 + Common Settings
-    final data2 = [
-      method,
-      count,
-      for (final filter in allFilters.sublist(4, 8)) ..._timeToParts(filter),
-      ...commonSettings,
-    ];
-
-    // Set 3 (ID: 3): Filters 9-12 + Common Settings
-    final data3 = [
-      method,
-      count,
-      for (final filter in allFilters.sublist(8, 12)) ..._timeToParts(filter),
-      ...commonSettings,
     ];
 
     return [

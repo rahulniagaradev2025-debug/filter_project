@@ -27,3 +27,12 @@ class BluetoothStatusChangedEvent extends BluetoothEvent {
   @override
   List<Object> get props => [state, device];
 }
+
+/// New event triggered when data is received from the device
+class BluetoothDataReceivedEvent extends BluetoothEvent {
+  final List<int> data;
+  const BluetoothDataReceivedEvent(this.data);
+
+  @override
+  List<Object> get props => [data];
+}

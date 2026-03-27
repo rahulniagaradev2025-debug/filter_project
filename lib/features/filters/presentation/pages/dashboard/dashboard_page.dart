@@ -87,13 +87,24 @@ class _DashboardHomeState extends State<_DashboardHome> {
                 _latestBleResponse = state.status.replaceAll('\r', r'\r');
                 if (data['type'] == 'live' || data['type'] == 'settings') {
                   _lastParsedData = data;
-                  
-                  // If it's a settings update, we might want to update the local preferences
                   if (data['type'] == 'settings') {
                     _showSettingsUpdateDialog(data);
                   }
                 }
               });
+            } else if (state is exec.ExecutionConfigReceived) {
+              // Handle the new structured config state
+              setState(() {
+                _latestBleResponse = state.rawResponse.replaceAll('\r', r'\r');
+                // We convert the config model to the map format the dashboard expects
+                _lastParsedData = {
+                  'type': 'settings',
+                  'method': state.config.method,
+                  'count': state.config.filterCount.toString(),
+                  'filters': state.config.filters.map((f) => TimeUtils.formatFilterTime(f)).toList(),
+                };
+              });
+              _showSettingsUpdateDialog(_lastParsedData);
             }
           },
         ),
@@ -209,7 +220,7 @@ class _DashboardHomeState extends State<_DashboardHome> {
               Text('Count: ${data['count']}'),
               const SizedBox(height: 8),
               const Text('Filter Times:', style: TextStyle(fontWeight: FontWeight.bold)),
-              ...(data['filters'] as List<String>).asMap().entries.map(
+              ...(data['filters'] as List<dynamic>).asMap().entries.map(
                     (e) => Text('Filter ${e.key + 1}: ${e.value}'),
                   ),
             ],

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../../core/utils/constants.dart';
 import '../../../../../core/storage/app_config_preferences.dart';
 import '../../../domain/entities/filter_config_entity.dart';
 import '../../../domain/entities/filter_entity.dart';
@@ -36,7 +37,7 @@ class _ConfigPageState extends State<ConfigPage> {
   void initState() {
     super.initState();
     _filters = List.generate(
-      8,
+      AppConstants.maxFilterCount,
       (_) => const FilterEntity(hour: 0, minute: 0, second: 0),
     );
     _loadSavedConfig();
@@ -77,8 +78,8 @@ class _ConfigPageState extends State<ConfigPage> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Text('Limit Reached'),
-        content: const Text(
-          'The maximum number of filters is 8. Please enter a value from 1 to 8.',
+        content: Text(
+          'The maximum number of filters is ${AppConstants.maxFilterCount}. Please enter a value from 1 to ${AppConstants.maxFilterCount}.',
         ),
         actions: [
           TextButton(
@@ -101,7 +102,7 @@ class _ConfigPageState extends State<ConfigPage> {
       return;
     }
 
-    if (count > 8) {
+    if (count > AppConstants.maxFilterCount) {
       _filterCountController.text = _filterCount == 0 ? '' : _filterCount.toString();
       _filterCountController.selection = TextSelection.fromPosition(
         TextPosition(offset: _filterCountController.text.length),
@@ -277,7 +278,7 @@ class _ConfigPageState extends State<ConfigPage> {
                       _buildTextFieldCard(
                         controller: _filterCountController,
                         label: 'Number of Relays',
-                        hint: 'Enter 1-8',
+                        hint: 'Enter 1-${AppConstants.maxFilterCount}',
                         keyboardType: TextInputType.number,
                         onChanged: _onFilterCountChanged,
                         icon: Icons.numbers_rounded,
