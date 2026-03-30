@@ -64,7 +64,7 @@ class PayloadParser {
       return {
         'type': 'settings_ack',
         'payloadId': _parseInt(payload['MID']),
-        'ack_id': payload['ACKID']?.toString().replaceAll('\\', ''),
+        'ack_id': payload['ACKID']?.toString().replaceAll('\\', '').replaceAll('"', ''),
         'message': payload['MESSAGE']?.toString() ?? '',
         'boot': payload['BOOT']?.toString() ?? '0',
         'details': payload,

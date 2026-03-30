@@ -11,6 +11,7 @@ class FilterConfigEntity extends Equatable {
   final FilterEntity dpScanTime;
   final FilterEntity afterFilterDpScanTime;
   final double dpDifferenceValue;
+  final int loopingLimit; // Added looping limit
 
   const FilterConfigEntity({
     required this.method,
@@ -22,6 +23,7 @@ class FilterConfigEntity extends Equatable {
     required this.dpScanTime,
     required this.afterFilterDpScanTime,
     required this.dpDifferenceValue,
+    this.loopingLimit = 0,
   });
 
   @override
@@ -35,5 +37,6 @@ class FilterConfigEntity extends Equatable {
         dpScanTime,
         afterFilterDpScanTime,
         dpDifferenceValue,
+        loopingLimit,
       ];
 }

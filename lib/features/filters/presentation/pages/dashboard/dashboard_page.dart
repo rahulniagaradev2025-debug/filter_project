@@ -182,8 +182,8 @@ class _DashboardHomeState extends State<_DashboardHome> {
           builder: (context, state) {
             final isConnected = state is BluetoothConnected;
             final borderColor = isConnected
-                ? Colors.green.withOpacity(0.7)
-                : Colors.red.withOpacity(0.7);
+                ? Colors.green.withValues(alpha: 0.7)
+                : Colors.red.withValues(alpha: 0.7);
 
             return InkWell(
               onTap: widget.onOpenBluetooth,
@@ -248,7 +248,7 @@ class _ResponseCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFD7E6F5)),
       ),
@@ -322,9 +322,9 @@ class _SmallActionBtn extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF2F80ED).withOpacity(0.1),
+          color: const Color(0xFF2F80ED).withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF2F80ED).withOpacity(0.3)),
+          border: Border.all(color: const Color(0xFF2F80ED).withValues(alpha: 0.3)),
         ),
         child: Row(
           children: [
@@ -376,12 +376,12 @@ class _FilterCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFE2E8EE)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),

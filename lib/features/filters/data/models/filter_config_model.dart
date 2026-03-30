@@ -12,6 +12,7 @@ class FilterConfigModel extends FilterConfigEntity {
     required super.dpScanTime,
     required super.afterFilterDpScanTime,
     required super.dpDifferenceValue,
+    super.loopingLimit = 0,
   });
 
   Map<String, dynamic> toJson() {
@@ -25,6 +26,7 @@ class FilterConfigModel extends FilterConfigEntity {
       'dpScanTime': FilterModel.fromEntity(dpScanTime).toJson(),
       'afterFilterDpScanTime': FilterModel.fromEntity(afterFilterDpScanTime).toJson(),
       'dpDifferenceValue': dpDifferenceValue,
+      'loopingLimit': loopingLimit,
     };
   }
 
@@ -39,6 +41,7 @@ class FilterConfigModel extends FilterConfigEntity {
       dpScanTime: entity.dpScanTime,
       afterFilterDpScanTime: entity.afterFilterDpScanTime,
       dpDifferenceValue: entity.dpDifferenceValue,
+      loopingLimit: entity.loopingLimit,
     );
   }
 
@@ -71,6 +74,7 @@ class FilterConfigModel extends FilterConfigEntity {
       ),
       dpDifferenceValue:
           double.tryParse(json['dpDifferenceValue']?.toString() ?? '0') ?? 0,
+      loopingLimit: json['loopingLimit'] as int? ?? 0,
     );
   }
 }

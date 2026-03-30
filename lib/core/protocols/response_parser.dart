@@ -1,21 +1,19 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../../features/filters/domain/entities/filter_entity.dart';
 import '../../features/filters/data/models/filter_config_model.dart';
 
 class ResponseParser {
-  /// Parses the hardware response (JSON or Colon-separated) into a structured Map.
   static Map<String, dynamic>? parse(String response) {
     final cleanResponse = response.trim();
     if (cleanResponse.isEmpty) return null;
 
-    // 1. Handle JSON Payloads
     if (cleanResponse.startsWith('{')) {
       try {
         final Map<String, dynamic> json = jsonDecode(cleanResponse);
         final mid = json['MID']?.toString();
 
         if (mid == '1' || mid == '4') {
-          // Settings Configured or Settings Acknowledgement
           if (json.containsKey('FILCNT')) {
             return {
               'type': 'CONFIG_UPDATE',
@@ -23,14 +21,16 @@ class ResponseParser {
               'config': _parseJsonConfig(json),
             };
           } else if (json.containsKey('MESSAGE')) {
+            // Hardware sometimes uses ACKID, sometimes ACK
+            final ackId = (json['ACKID'] ?? json['ACK'])?.toString();
             return {
               'type': 'ACK',
               'payloadId': int.tryParse(mid!) ?? 1,
+              'ackId': ackId, 
               'message': json['MESSAGE'],
             };
           }
         } else if (mid == '31' || mid == '5') {
-          // Live Status Update
           return {
             'type': 'LIVE_STATUS',
             'payloadId': int.tryParse(mid!) ?? 5,
@@ -38,11 +38,11 @@ class ResponseParser {
           };
         }
       } catch (e) {
+        debugPrint("JSON Parse Error: $e in string: $cleanResponse");
         return null;
       }
     }
 
-    // 2. Handle Colon Protocol ($:Len:ID:Data...)
     if (cleanResponse.startsWith('\$')) {
       final parts = cleanResponse.split(':');
       if (parts.length < 4) return null;
@@ -88,6 +88,7 @@ class ResponseParser {
       dpScanTime: parseTime(json['DPSCAN']?.toString()),
       afterFilterDpScanTime: parseTime(json['FILAFTER']?.toString()),
       dpDifferenceValue: double.tryParse(json['DPVALUE']?.toString() ?? '0') ?? 0,
+      loopingLimit: int.tryParse(json['LOOPLIMIT']?.toString() ?? '0') ?? 0,
     );
   }
 
@@ -112,6 +113,7 @@ class ResponseParser {
       dpScanTime: parseFilter(26),
       afterFilterDpScanTime: parseFilter(29),
       dpDifferenceValue: (parts.length > 32) ? (double.tryParse(parts[32]) ?? 0) : 0,
+      loopingLimit: (parts.length > 33) ? (int.tryParse(parts[33]) ?? 0) : 0,
     );
   }
 }

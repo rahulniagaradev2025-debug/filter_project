@@ -22,6 +22,7 @@ class LogsPage extends StatelessWidget {
           String displayData = "Waiting for data...";
           if (state is ExecutionStatusUpdate) {
             displayData = state.status;
+            print("Received data: $displayData");
           }
 
           return Padding(
