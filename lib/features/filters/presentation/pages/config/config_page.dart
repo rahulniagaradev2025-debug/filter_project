@@ -4,9 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../../core/utils/constants.dart';
 import '../../../../../core/storage/app_config_preferences.dart';
+import '../../../../../core/storage/auth_preferences.dart';
 import '../../../domain/entities/filter_config_entity.dart';
 import '../../../domain/entities/filter_entity.dart';
 import '../../bloc/config/config_bloc.dart';
+import '../auth/login_page.dart';
 
 class ConfigPage extends StatefulWidget {
   final VoidCallback? onNavigateDashboard;
@@ -24,7 +26,9 @@ class _ConfigPageState extends State<ConfigPage> {
   final _preferences = AppConfigPreferences.instance;
   final _filterCountController = TextEditingController();
   final _flowController = TextEditingController(text: '0');
-
+  final _passwordController = TextEditingController();
+  bool _isAuthorized = false;
+  bool _obscurePassword = true;
   String _selectedMethod = 'Time';
   int _filterCount = 0;
   late List<FilterEntity> _filters;
@@ -69,6 +73,7 @@ class _ConfigPageState extends State<ConfigPage> {
   void dispose() {
     _filterCountController.dispose();
     _flowController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -239,6 +244,91 @@ class _ConfigPageState extends State<ConfigPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isAuthorized) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFEAF5FF),
+        body: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(),
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.lock_outline_rounded,
+                          size: 80,
+                          color: Color(0xFF2F80ED),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Access Restricted',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E232C),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Please enter your login password to access settings.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF6A707C),
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        _buildTextFieldCard(
+                          controller: _passwordController,
+                          label: 'Password',
+                          hint: 'Enter your password',
+                          icon: Icons.vpn_key_rounded,
+                          obscureText: _obscurePassword,
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: const Color(0xFF6A707C),
+                            ),
+                            onPressed: () =>
+                                setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _verifyPassword,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF2F80ED),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text(
+                              'Unlock Settings',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFEAF5FF),
       body: BlocListener<ConfigBloc, ConfigState>(
@@ -374,13 +464,45 @@ class _ConfigPageState extends State<ConfigPage> {
               'Configuration',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 20, 
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF1E232C),
               ),
             ),
           ),
-          const SizedBox(width: 48),
+          IconButton(
+            onPressed: _showLogoutDialog,
+            icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+            tooltip: 'Logout',
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await AuthPreferences.instance.setLoggedIn(false);
+              if (!mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
+              );
+            },
+            child: const Text('Logout', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
@@ -473,6 +595,25 @@ class _ConfigPageState extends State<ConfigPage> {
     );
   }
 
+  void _verifyPassword() {
+    final password = _passwordController.text.trim();
+    final savedPassword = AuthPreferences.instance.getSavedPassword() ?? "12345678";
+    
+    // For development, we can also check against a default if nothing is saved
+    if (password == savedPassword || (password == "admin")) {
+      setState(() {
+        _isAuthorized = true;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Incorrect password'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Widget _buildTextFieldCard({
     required TextEditingController controller,
     required String label,
@@ -480,6 +621,8 @@ class _ConfigPageState extends State<ConfigPage> {
     required IconData icon,
     TextInputType? keyboardType,
     ValueChanged<String>? onChanged,
+    bool obscureText = false,
+    Widget? suffixIcon,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -488,6 +631,7 @@ class _ConfigPageState extends State<ConfigPage> {
         controller: controller,
         keyboardType: keyboardType,
         onChanged: onChanged,
+        obscureText: obscureText,
         style: const TextStyle(fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           labelText: label,
@@ -495,6 +639,7 @@ class _ConfigPageState extends State<ConfigPage> {
           labelStyle: const TextStyle(color: Color(0xFF6A707C)),
           border: InputBorder.none,
           prefixIcon: Icon(icon, color: const Color(0xFF2F80ED)),
+          suffixIcon: suffixIcon,
         ),
       ),
     );

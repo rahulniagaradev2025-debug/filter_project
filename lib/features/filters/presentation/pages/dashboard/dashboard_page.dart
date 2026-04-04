@@ -25,6 +25,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   final _preferences = AppConfigPreferences.instance;
   int _selectedIndex = 0;
+  int _configKeyCounter = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +44,10 @@ class _DashboardPageState extends State<DashboardPage> {
             },
           ),
           ReportPage(onNavigateDashboard: () => _onTabSelected(0)),
-          ConfigPage(onNavigateDashboard: () => _onTabSelected(0)),
+          ConfigPage(
+            key: ValueKey('config_$_configKeyCounter'),
+            onNavigateDashboard: () => _onTabSelected(0),
+          ),
         ],
       ),
       bottomNavigationBar: AppBottomNav(
@@ -54,7 +58,12 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _onTabSelected(int index) {
-    setState(() => _selectedIndex = index);
+    setState(() {
+      if (index == 2 && _selectedIndex != 2) {
+        _configKeyCounter++;
+      }
+      _selectedIndex = index;
+    });
   }
 }
 
